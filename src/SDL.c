@@ -167,6 +167,7 @@ void SDL_SetMainReady(void)
 
 int SDL_InitSubSystem(Uint32 flags)
 {
+    printf("this is my test SDL_InitSubSystem\n");
     Uint32 flags_initialized = 0;
 
     if (!SDL_MainIsReady) {
@@ -346,6 +347,7 @@ quit_and_error:
 
 int SDL_Init(Uint32 flags)
 {
+    printf("this is my test SDL_Init\n");
     return SDL_InitSubSystem(flags);
 }
 
