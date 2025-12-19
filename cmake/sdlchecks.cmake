@@ -834,6 +834,28 @@ macro(CheckVivante)
 endmacro()
 
 # Requires:
+# - n/a
+macro(CheckMali)
+  if(SDL_MALI)
+    check_c_source_compiles("
+        #define LINUX
+        #define EGL_API_FB
+        #include <EGL/egl.h>
+        int main(int argc, char** argv) {}" HAVE_VIDEO_MALI_EGL_FB)
+    if(HAVE_VIDEO_MALI_EGL_FB)
+      set(HAVE_MALI TRUE)
+      set(HAVE_SDL_VIDEO TRUE)
+      set(SDL_VIDEO_DRIVER_MALI 1)
+
+      file(GLOB MALI_SOURCES ${SDL2_SOURCE_DIR}/src/video/mali-fbdev/*.c)
+      list(APPEND SOURCE_FILES  ${MALI_SOURCES})
+      list(APPEND SDL_CFLAGS -DLINUX -DEGL_API_FB)
+      list(APPEND EXTRA_LIBS EGL)
+    endif()
+  endif()
+endmacro()
+
+# Requires:
 # - nada
 macro(CheckGLX)
   if(SDL_OPENGL)
