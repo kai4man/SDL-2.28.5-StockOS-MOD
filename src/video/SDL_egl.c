@@ -66,7 +66,8 @@
 #define DEFAULT_OGL_ES_PVR (vc4 ? "libGLES_CM.so.1" : "libbrcmGLESv2.so")
 #define DEFAULT_OGL_ES     (vc4 ? "libGLESv1_CM.so.1" : "libbrcmGLESv2.so")
 
-#elif SDL_VIDEO_DRIVER_ANDROID || SDL_VIDEO_DRIVER_VIVANTE || SDL_VIDEO_DRIVER_MALI
+/* #elif SDL_VIDEO_DRIVER_ANDROID || SDL_VIDEO_DRIVER_VIVANTE || SDL_VIDEO_DRIVER_MALI */
+#elif SDL_VIDEO_DRIVER_ANDROID || SDL_VIDEO_DRIVER_VIVANTE || defined(SDL_VIDEO_DRIVER_MALI)
 /* Android, Vivante, and Mali fb */
 #define DEFAULT_EGL        "libEGL.so"
 #define DEFAULT_OGL_ES2    "libGLESv2.so"
@@ -432,8 +433,10 @@ static int SDL_EGL_LoadLibraryInternal(_THIS, const char *egl_path)
     LOAD_FUNC(eglGetConfigAttrib);
     LOAD_FUNC(eglCreateContext);
     LOAD_FUNC(eglDestroyContext);
+    LOAD_FUNC(eglCreatePixmapSurface);
     LOAD_FUNC(eglCreatePbufferSurface);
     LOAD_FUNC(eglCreateWindowSurface);
+    LOAD_FUNC(eglGetCurrentSurface);
     LOAD_FUNC(eglDestroySurface);
     LOAD_FUNC(eglMakeCurrent);
     LOAD_FUNC(eglSwapBuffers);

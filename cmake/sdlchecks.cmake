@@ -836,32 +836,25 @@ endmacro()
 # Requires:
 # - n/a
 macro(CheckMali)
-  if(SDL_MALI)
-  
+  if(VIDEO_MALI)
     set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
-
     check_c_source_compiles("
         #define LINUX
         #define EGL_API_FB
         #include <EGL/egl.h>
-        int dummy(void) { return 0; }
-    " HAVE_VIDEO_MALI_EGL_FB)
-
-    unset(CMAKE_TRY_COMPILE_TARGET_TYPE)
-    
+        int main(int argc, char** argv) {}" HAVE_VIDEO_MALI_EGL_FB)
     if(HAVE_VIDEO_MALI_EGL_FB)
-      set(HAVE_MALI TRUE)
+      set(HAVE_VIDEO_MALI TRUE)
       set(HAVE_SDL_VIDEO TRUE)
-      set(SDL_VIDEO_DRIVER_MALI 1)
 
       file(GLOB MALI_SOURCES ${SDL2_SOURCE_DIR}/src/video/mali-fbdev/*.c)
-      list(APPEND SOURCE_FILES ${MALI_SOURCES})
-      list(APPEND SDL_CFLAGS -DLINUX -DEGL_API_FB)
-
-      # list(APPEND EXTRA_LIBS EGL)
-    endif()
-  endif()
-endmacro()
+      set(SOURCE_FILES ${SOURCE_FILES} ${MALI_SOURCES})
+      set(SDL_VIDEO_DRIVER_MALI 1)
+      set(SDL_CFLAGS "${SDL_CFLAGS} -DLINUX -DEGL_API_FB")
+      list(APPEND EXTRA_LIBS EGL)
+    endif(HAVE_VIDEO_MALI_EGL_MALI)
+  endif(VIDEO_MALI)
+endmacro(CheckMali)
 
 # Requires:
 # - nada

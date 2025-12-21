@@ -1,5 +1,5 @@
 /*
-Simple DirectMedia Layer
+  Simple DirectMedia Layer
   Copyright (C) 1997-2014 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
@@ -23,7 +23,7 @@ Simple DirectMedia Layer
 #ifndef _SDL_maliopengles_h
 #define _SDL_maliopengles_h
 
-#if defined(SDL_VIDEO_DRIVER_MALI) && defined(SDL_VIDEO_OPENGL_EGL)
+#if SDL_VIDEO_DRIVER_MALI && SDL_VIDEO_OPENGL_EGL
 
 #include "../SDL_sysvideo.h"
 #include "../SDL_egl_c.h"
@@ -32,14 +32,13 @@ Simple DirectMedia Layer
 #define MALI_GLES_GetAttribute SDL_EGL_GetAttribute
 #define MALI_GLES_GetProcAddress SDL_EGL_GetProcAddress
 #define MALI_GLES_UnloadLibrary SDL_EGL_UnloadLibrary
-#define MALI_GLES_SetSwapInterval SDL_EGL_SetSwapInterval
-#define MALI_GLES_GetSwapInterval SDL_EGL_GetSwapInterval
 #define MALI_GLES_DeleteContext SDL_EGL_DeleteContext
 
 extern int MALI_GLES_LoadLibrary(_THIS, const char *path);
 extern SDL_GLContext MALI_GLES_CreateContext(_THIS, SDL_Window * window);
 extern int MALI_GLES_SwapWindow(_THIS, SDL_Window * window);
 extern int MALI_GLES_MakeCurrent(_THIS, SDL_Window * window, SDL_GLContext context);
+extern void MALI_GLES_DefaultProfileConfig(_THIS, int *mask, int *major, int *minor);
 
 #endif /* SDL_VIDEO_DRIVER_MALI && SDL_VIDEO_OPENGL_EGL */
 
