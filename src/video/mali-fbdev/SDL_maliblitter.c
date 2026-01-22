@@ -78,6 +78,7 @@ static GLchar* blit_frag_quilez =
 
 int MALI_Blitter_CreateContext(_THIS, MALI_Blitter *blitter, NativeWindowType nw)
 {
+    printf("[TRACE] MALI_Blitter_CreateContext: called, blitter=%p, nw=%p\n", blitter, nw);
     /* max 14 values plus terminator. */
     EGLint screen_attribs[] = {
         EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
@@ -104,17 +105,23 @@ int MALI_Blitter_CreateContext(_THIS, MALI_Blitter *blitter, NativeWindowType nw
     EGLint config_chosen, config_count;
 
     if (!_this->egl_data) {
+    printf("[TRACE] MALI_Blitter_CreateContext: _this->egl_data is NULL!\n");
         SDL_SetError("EGL not initialized");
         return 0;
     }
     
     blitter->egl_display = _this->egl_data->egl_display;
-    if (blitter->eglGetConfigs(blitter->egl_display, configs, MAX_CONFIGS, &config_count) == EGL_FALSE) {
+    printf("[TRACE] MALI_Blitter_CreateContext: egl_display=%p\n", blitter->egl_display);
+    EGLBoolean getConfigsRes = blitter->eglGetConfigs(blitter->egl_display, configs, MAX_CONFIGS, &config_count);
+printf("[TRACE] MALI_Blitter_CreateContext: eglGetConfigs result=%d config_count=%d\n", getConfigsRes, config_count);
+if (getConfigsRes == EGL_FALSE) {
         SDL_EGL_SetError("mali-fbdev: No compatible EGL configs", "eglGetConfigs");
         return 0;
     }
 
-    if (!blitter->eglChooseConfig(blitter->egl_display, screen_attribs, configs, MAX_CONFIGS, &config_chosen))
+    EGLBoolean chooseConfigRes = blitter->eglChooseConfig(blitter->egl_display, screen_attribs, configs, MAX_CONFIGS, &config_chosen);
+printf("[TRACE] MALI_Blitter_CreateContext: eglChooseConfig result=%d config_chosen=%d\n", chooseConfigRes, config_chosen);
+if (!chooseConfigRes)
     {
         SDL_EGL_SetError("mali-fbdev: Failed to choose an EGL config", "eglChooseConfig");
         return 0;
@@ -123,12 +130,14 @@ int MALI_Blitter_CreateContext(_THIS, MALI_Blitter *blitter, NativeWindowType nw
     blitter->gl_context = blitter->eglCreateContext(blitter->egl_display,
                                       configs[0],
                                       EGL_NO_CONTEXT, context_attribs);
+    printf("[TRACE] MALI_Blitter_CreateContext: eglCreateContext returned %p\n", blitter->gl_context);
     if (blitter->gl_context == EGL_NO_CONTEXT) {
         SDL_EGL_SetError("mali-fbdev: Could not create EGL context", "eglCreateContext");
         return 0;
     }
 
     blitter->egl_surface = blitter->eglCreateWindowSurface(blitter->egl_display, configs[0], nw, window_attribs);
+    printf("[TRACE] MALI_Blitter_CreateContext: eglCreateWindowSurface returned %p\n", blitter->egl_surface);
     if (blitter->egl_surface == EGL_NO_SURFACE) {
         SDL_EGL_SetError("mali-fbdev: failed to create window surface", "eglCreateContext");
         return 0;
@@ -573,6 +582,7 @@ void MALI_BlitterReconfigure(_THIS, SDL_Window *window, MALI_Blitter *blitter)
     /* Reconfigure the device */
     blitter->window = window;
     blitter->egl_display = _this->egl_data->egl_display;
+    printf("[TRACE] MALI_Blitter_CreateContext: egl_display=%p\n", blitter->egl_display);
     blitter->viewport_width = dispdata->native_display.width,
     blitter->viewport_height = dispdata->native_display.height,
     blitter->plane_width = window->w;

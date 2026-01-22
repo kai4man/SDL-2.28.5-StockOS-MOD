@@ -120,6 +120,7 @@ VideoBootStrap MALI_bootstrap = {
 int
 MALI_VideoInit(_THIS)
 {
+    printf("[TRACE] MALI_VideoInit: called\n");
     const char *blitter_status = NULL, *rotation = NULL;
     SDL_VideoDisplay display;
     SDL_DisplayMode current_mode;
@@ -127,22 +128,27 @@ MALI_VideoInit(_THIS)
     struct fb_var_screeninfo vinfo;
     int fd;
 
-    data = (SDL_DisplayData *) SDL_calloc(1, sizeof(SDL_DisplayData));
+    printf("[TRACE] MALI_VideoInit: Allocating SDL_DisplayData\n");
+data = (SDL_DisplayData *) SDL_calloc(1, sizeof(SDL_DisplayData));
     if (data == NULL) {
         return SDL_OutOfMemory();
     }
 
     fd = open("/dev/fb0", O_RDWR, 0);
+printf("[TRACE] MALI_VideoInit: open /dev/fb0 returned %d\n", fd);
     if (fd < 0) {
         return SDL_SetError("mali-fbdev: Could not open framebuffer device");
     }
 
     data->ion_fd = open("/dev/ion", O_RDWR, 0);
+printf("[TRACE] MALI_VideoInit: open /dev/ion returned %d\n", data->ion_fd);
     if (data->ion_fd < 0) {
         return SDL_SetError("mali-fbdev: Could not open ion device");
     }
 
-    if (ioctl(fd, FBIOGET_VSCREENINFO, &vinfo) < 0) {
+    int ioctl_res = ioctl(fd, FBIOGET_VSCREENINFO, &vinfo);
+printf("[TRACE] MALI_VideoInit: ioctl FBIOGET_VSCREENINFO returned %d\n", ioctl_res);
+if (ioctl_res < 0) {
         MALI_VideoQuit(_this);
         return SDL_SetError("mali-fbdev: Could not get framebuffer information");
     }
@@ -205,6 +211,7 @@ MALI_VideoInit(_THIS)
     }
 #endif
 
+    printf("[TRACE] MALI_VideoInit: finished successfully\n");
     return 0;
 }
 
@@ -234,12 +241,14 @@ MALI_GetDisplayModes(_THIS, SDL_VideoDisplay * display)
 int
 MALI_SetDisplayMode(_THIS, SDL_VideoDisplay * display, SDL_DisplayMode * mode)
 {
+    printf("[TRACE] MALI_VideoInit: finished successfully\n");
     return 0;
 }
 
 static EGLSurface *
 MALI_EGL_InitPixmapSurfaces(_THIS, SDL_Window *window)
 {
+    printf("[TRACE] MALI_EGL_InitPixmapSurfaces: called, window=%p\n", window);
     struct ion_fd_data ion_data;
     struct ion_allocation_data allocation_data;
     SDL_DisplayData *displaydata;
@@ -248,15 +257,21 @@ MALI_EGL_InitPixmapSurfaces(_THIS, SDL_Window *window)
     GLint surf_attribs[3] = {};
 
     windowdata = window->driverdata;
+    printf("[TRACE] MALI_EGL_InitPixmapSurfaces: windowdata=%p\n", windowdata);
     displaydata = SDL_GetDisplayDriverData(0);
+    printf("[TRACE] MALI_EGL_InitPixmapSurfaces: displaydata=%p\n", displaydata);
 
     width = window->w;
     height = window->h;
+    printf("[TRACE] MALI_EGL_InitPixmapSurfaces: window size %dx%d\n", width, height);
 
     _this->gl_config.multisamplebuffers = 0;
     _this->gl_config.multisamplesamples = 0;
     _this->egl_data->egl_surfacetype = EGL_PIXMAP_BIT;
-    if (SDL_EGL_ChooseConfig(_this) != 0) {
+    printf("[TRACE] MALI_EGL_InitPixmapSurfaces: calling SDL_EGL_ChooseConfig\n");
+    int chooseConfigRes = SDL_EGL_ChooseConfig(_this);
+    printf("[TRACE] MALI_EGL_InitPixmapSurfaces: SDL_EGL_ChooseConfig returned %d\n", chooseConfigRes);
+    if (chooseConfigRes != 0) {
         SDL_SetError("mali-fbdev: Unable to find a suitable EGL config");
         return EGL_NO_SURFACE;
     }
@@ -277,7 +292,9 @@ MALI_EGL_InitPixmapSurfaces(_THIS, SDL_Window *window)
 
     // Populate pixmap definitions
     displaydata->stride = MALI_ALIGN(width * 4, 64);
+    printf("[TRACE] MALI_EGL_InitPixmapSurfaces: stride=%lu, starting loop for 3 surfaces\n", displaydata->stride);
     for (i = 0; i < 3; i++) {
+        printf("[TRACE] MALI_EGL_InitPixmapSurfaces: creating surface[%d]\n", i);
         MALI_EGL_Surface *surf = &windowdata->surface[i];
         surf->pixmap = (mali_pixmap){
             .width = width,
@@ -304,7 +321,9 @@ MALI_EGL_InitPixmapSurfaces(_THIS, SDL_Window *window)
             .flags = 1 << ION_FLAG_CACHED
         };
 
+        printf("[TRACE] MALI_EGL_InitPixmapSurfaces: surface[%d] calling ION_IOC_ALLOC, size=%lu\n", i, allocation_data.len);
         io = ioctl(displaydata->ion_fd, ION_IOC_ALLOC, &allocation_data);
+        printf("[TRACE] MALI_EGL_InitPixmapSurfaces: surface[%d] ION_IOC_ALLOC returned %d, handle=%lu\n", i, io, allocation_data.handle);
         if (io != 0) {
             SDL_SetError("mali-fbdev: Unable to create backing ION buffers");
             return EGL_NO_SURFACE;
@@ -315,7 +334,9 @@ MALI_EGL_InitPixmapSurfaces(_THIS, SDL_Window *window)
             .handle = allocation_data.handle
         };
 
+        printf("[TRACE] MALI_EGL_InitPixmapSurfaces: surface[%d] calling ION_IOC_SHARE\n", i);
         io = ioctl(displaydata->ion_fd, ION_IOC_SHARE, &ion_data);
+        printf("[TRACE] MALI_EGL_InitPixmapSurfaces: surface[%d] ION_IOC_SHARE returned %d, fd=%d\n", i, io, ion_data.fd);
         if (io != 0) {
             SDL_SetError("mali-fbdev: Failure exporting ION buffer handle");
             return EGL_NO_SURFACE;
@@ -328,19 +349,27 @@ MALI_EGL_InitPixmapSurfaces(_THIS, SDL_Window *window)
 
         /* Create Pixmap Surface using DMA_BUF framebuffer fd */
         surf->pixmap.handles[0] = ion_data.fd;
-
+        printf("[TRACE] MALI_EGL_InitPixmapSurfaces: surface[%d] calling egl_create_pixmap_ID_mapping, func_ptr=%p\n", i, displaydata->egl_create_pixmap_ID_mapping);
+        if (!displaydata->egl_create_pixmap_ID_mapping) {
+            printf("[TRACE] MALI_EGL_InitPixmapSurfaces: ERROR - egl_create_pixmap_ID_mapping is NULL!\n");
+            return EGL_NO_SURFACE;
+        }
         surf->pixmap_handle = displaydata->egl_create_pixmap_ID_mapping(&surf->pixmap);
+        printf("[TRACE] MALI_EGL_InitPixmapSurfaces: surface[%d] egl_create_pixmap_ID_mapping returned %p\n", i, (void*)surf->pixmap_handle);
         SDL_LogDebug(SDL_LOG_CATEGORY_VIDEO, "mali-fbdev: Created pixmap handle %p\n", (void *)surf->pixmap_handle);
         if ((int)surf->pixmap_handle < 0) {
             SDL_EGL_SetError("mali-fbdev: Unable to create EGL window surface", "egl_create_pixmap_ID_mapping");
             return EGL_NO_SURFACE;
         }
 
+        printf("[TRACE] MALI_EGL_InitPixmapSurfaces: surface[%d] calling eglCreatePixmapSurface, display=%p, config=%p, handle=%p\n", 
+               i, _this->egl_data->egl_display, _this->egl_data->egl_config, (void*)surf->pixmap_handle);
         surf->egl_surface = _this->egl_data->eglCreatePixmapSurface(
             _this->egl_data->egl_display,
             _this->egl_data->egl_config,
             surf->pixmap_handle,
             surf_attribs);
+        printf("[TRACE] MALI_EGL_InitPixmapSurfaces: surface[%d] eglCreatePixmapSurface returned %p\n", i, surf->egl_surface);
         if (surf->egl_surface == EGL_NO_SURFACE) {
             SDL_EGL_SetError("mali-fbdev: Unable to create EGL window surface", "eglCreatePixmapSurface");
             return EGL_NO_SURFACE;
@@ -353,10 +382,14 @@ MALI_EGL_InitPixmapSurfaces(_THIS, SDL_Window *window)
     windowdata->glFlush = SDL_GL_GetProcAddress("glFlush");
 
     /* Reconfigure the blitter now. */
+    printf("[TRACE] MALI_EGL_InitPixmapSurfaces: calling MALI_BlitterReconfigure\n");
     MALI_BlitterReconfigure(_this, window, displaydata->blitter);
+    printf("[TRACE] MALI_EGL_InitPixmapSurfaces: MALI_BlitterReconfigure completed\n");
 
     /* Done. */
-    return windowdata->surface[windowdata->back_buffer].egl_surface;
+    EGLSurface *result = windowdata->surface[windowdata->back_buffer].egl_surface;
+    printf("[TRACE] MALI_EGL_InitPixmapSurfaces: finished successfully, returning surface %p\n", result);
+    return result;
 }
 
 static void
@@ -410,6 +443,7 @@ MALI_EGL_DeinitPixmapSurfaces(_THIS, SDL_Window *window)
 int
 MALI_CreateWindow(_THIS, SDL_Window * window)
 {
+    printf("[TRACE] MALI_CreateWindow: called for window %p\n", window);
     SDL_WindowData *windowdata;
     SDL_VideoDisplay *display = SDL_GetDisplayForWindow(window);
     SDL_DisplayData *displaydata;
@@ -419,6 +453,7 @@ MALI_CreateWindow(_THIS, SDL_Window * window)
 
     /* Allocate window internal data */
     windowdata = (SDL_WindowData *)SDL_calloc(1, sizeof(SDL_WindowData));
+    printf("[TRACE] MALI_CreateWindow: allocated SDL_WindowData %p\n", windowdata);
     if (windowdata == NULL) {
         return SDL_OutOfMemory();
     }
@@ -435,13 +470,20 @@ MALI_CreateWindow(_THIS, SDL_Window * window)
 
     /* OpenGL ES is the law here */
     window->flags |= SDL_WINDOW_OPENGL;
+    printf("[TRACE] MALI_CreateWindow: checking egl_data, _this->egl_data=%p\n", _this->egl_data);
     if (!_this->egl_data) {
-        if (SDL_EGL_LoadLibrary(_this, NULL, EGL_DEFAULT_DISPLAY, 0) < 0) {
+        printf("[TRACE] MALI_CreateWindow: egl_data is NULL, calling SDL_EGL_LoadLibrary\n");
+        int loadLibRes = SDL_EGL_LoadLibrary(_this, NULL, EGL_DEFAULT_DISPLAY, 0);
+        printf("[TRACE] MALI_CreateWindow: SDL_EGL_LoadLibrary returned %d\n", loadLibRes);
+        if (loadLibRes < 0) {
             /* Try again with OpenGL ES 2.0 */
+            printf("[TRACE] MALI_CreateWindow: retrying with OpenGL ES 2.0\n");
             _this->gl_config.profile_mask = SDL_GL_CONTEXT_PROFILE_ES;
             _this->gl_config.major_version = 2;
             _this->gl_config.minor_version = 0;
-            if (SDL_EGL_LoadLibrary(_this, NULL, EGL_DEFAULT_DISPLAY, 0) < 0) {
+            int loadLibRes2 = SDL_EGL_LoadLibrary(_this, NULL, EGL_DEFAULT_DISPLAY, 0);
+            printf("[TRACE] MALI_CreateWindow: SDL_EGL_LoadLibrary (ES 2.0) returned %d\n", loadLibRes2);
+            if (loadLibRes2 < 0) {
                 return SDL_SetError("Can't load EGL/GL library on window creation.");
             }
         }
@@ -452,26 +494,56 @@ MALI_CreateWindow(_THIS, SDL_Window * window)
     /* If the blitter is required, we will manually create the EGL Surface resources using the ION allocator
        and some reverse engineered mali internals */
     if (displaydata->blitter) {
+    printf("[TRACE] MALI_CreateWindow: using blitter branch\n");
+        printf("[TRACE] MALI_CreateWindow: looking for mali entrypoints\n");
+        
+        /* Try eglGetProcAddress first */
         displaydata->egl_create_pixmap_ID_mapping = SDL_EGL_GetProcAddress(_this, "egl_create_pixmap_ID_mapping");
+        printf("[TRACE] MALI_CreateWindow: egl_create_pixmap_ID_mapping (via eglGetProcAddress) = %p\n", displaydata->egl_create_pixmap_ID_mapping);
+        
+        /* If not found, try direct dlsym from libEGL.so */
+        if (!displaydata->egl_create_pixmap_ID_mapping && _this->egl_data && _this->egl_data->egl_dll_handle) {
+            printf("[TRACE] MALI_CreateWindow: trying direct load from egl_dll_handle\n");
+            displaydata->egl_create_pixmap_ID_mapping = SDL_LoadFunction(_this->egl_data->egl_dll_handle, "egl_create_pixmap_ID_mapping");
+            printf("[TRACE] MALI_CreateWindow: egl_create_pixmap_ID_mapping (via dlsym) = %p\n", displaydata->egl_create_pixmap_ID_mapping);
+        }
+        
         displaydata->egl_destroy_pixmap_ID_mapping = SDL_EGL_GetProcAddress(_this, "egl_destroy_pixmap_ID_mapping");
+        printf("[TRACE] MALI_CreateWindow: egl_destroy_pixmap_ID_mapping (via eglGetProcAddress) = %p\n", displaydata->egl_destroy_pixmap_ID_mapping);
+        
+        /* If not found, try direct dlsym from libEGL.so */
+        if (!displaydata->egl_destroy_pixmap_ID_mapping && _this->egl_data && _this->egl_data->egl_dll_handle) {
+            displaydata->egl_destroy_pixmap_ID_mapping = SDL_LoadFunction(_this->egl_data->egl_dll_handle, "egl_destroy_pixmap_ID_mapping");
+            printf("[TRACE] MALI_CreateWindow: egl_destroy_pixmap_ID_mapping (via dlsym) = %p\n", displaydata->egl_destroy_pixmap_ID_mapping);
+        }
+        
         if (!displaydata->egl_create_pixmap_ID_mapping || !displaydata->egl_destroy_pixmap_ID_mapping) {
+            printf("[TRACE] MALI_CreateWindow: ERROR - mali entrypoints not found! egl_dll_handle=%p\n", 
+                   _this->egl_data ? _this->egl_data->egl_dll_handle : NULL);
             MALI_VideoQuit(_this);
             return SDL_SetError("mali-fbdev: Can't find mali pixmap entrypoints");
         }
 
-        windowdata->egl_surface = MALI_EGL_InitPixmapSurfaces(_this, window);    
+        printf("[TRACE] MALI_CreateWindow: calling MALI_EGL_InitPixmapSurfaces\n");
+        windowdata->egl_surface = MALI_EGL_InitPixmapSurfaces(_this, window);
+        printf("[TRACE] MALI_CreateWindow: MALI_EGL_InitPixmapSurfaces returned %p\n", windowdata->egl_surface);
     } else {
         windowdata->egl_surface = SDL_EGL_CreateSurface(_this, (NativeWindowType) &displaydata->native_display);
     }
 
     if (windowdata->egl_surface == EGL_NO_SURFACE) {
+    printf("[TRACE] MALI_CreateWindow: egl_surface == EGL_NO_SURFACE!\n");
         MALI_VideoQuit(_this);
-        return SDL_SetError("mali-fbdev: Can't create EGL window surface");
+        printf("[TRACE] MALI_CreateWindow: Fail to create EGL window surface, returning error\n");
+    return SDL_SetError("mali-fbdev: Can't create EGL window surface");
     }
 
+    printf("[TRACE] MALI_CreateWindow: Setting current EGL surface\n");
     /* Set the current surface NOW. */
     egl_context = (EGLContext)SDL_GL_GetCurrentContext();
-    if (SDL_EGL_MakeCurrent(_this, windowdata->egl_surface, egl_context) != 0) {
+    int mc_result = SDL_EGL_MakeCurrent(_this, windowdata->egl_surface, egl_context);
+printf("[TRACE] MALI_CreateWindow: SDL_EGL_MakeCurrent returned %d\n", mc_result);
+if (mc_result != 0) {
         MALI_VideoQuit(_this);
         return SDL_SetError("mali-fbdev: Can't set EGL context");
     }
@@ -481,6 +553,7 @@ MALI_CreateWindow(_THIS, SDL_Window * window)
     SDL_SetKeyboardFocus(window);
 
     /* Window has been successfully created */
+    printf("[TRACE] MALI_VideoInit: finished successfully\n");
     return 0;
 }
 
@@ -540,6 +613,7 @@ MALI_SetWindowSize(_THIS, SDL_Window * window)
      * if the dimensions of our surface changed.
      */
     if (displaydata->blitter) {
+    printf("[TRACE] MALI_CreateWindow: using blitter branch\n");
         if ((displaydata->blitter->plane_width == window->w)
          && (displaydata->blitter->plane_height == window->h))
             return;
@@ -574,6 +648,7 @@ MALI_GLES_SetSwapInterval(_THIS, int interval)
         return 0;
 
     _this->egl_data->egl_swapinterval = interval != 0;
+    printf("[TRACE] MALI_VideoInit: finished successfully\n");
     return 0;
 }
 
