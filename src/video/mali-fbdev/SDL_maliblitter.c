@@ -150,6 +150,7 @@ static void
 get_aspect_correct_coords(int viewport[2], int plane[2], int rotation, GLfloat vert[4][4], GLfloat scale[2])
 {
     /* FIXME: Sorry for the spaghetti! */
+    char *force_stretch;
     float aspect_plane, aspect_viewport, ratio_x, ratio_y;
     int shift_x, shift_y, temp;
 
@@ -160,22 +161,32 @@ get_aspect_correct_coords(int viewport[2], int plane[2], int rotation, GLfloat v
         plane[1] = temp;
     }
 
-    // Choose which edge to touch
-    aspect_plane = (float)plane[0] / plane[1];
-    aspect_viewport = (float)viewport[0] / viewport[1];
-
-    if (aspect_viewport > aspect_plane) {
-        // viewport wider than plane
-        ratio_x = plane[0] * (float)((float)viewport[1] / plane[1]);
+    // Check if user wants to force stretch (ignore aspect ratio)
+    force_stretch = SDL_getenv("SDL_MALI_FORCE_STRETCH");
+    if (force_stretch != NULL && *force_stretch == '1') {
+        // Force fullscreen stretch - ignore aspect ratio
+        ratio_x = viewport[0];
         ratio_y = viewport[1];
-        shift_x = (viewport[0] - ratio_x) / 2.0f;
+        shift_x = 0;
         shift_y = 0;
     } else {
-        // plane wider than viewport
-        ratio_x = viewport[0];
-        ratio_y = plane[1] * (float)((float)viewport[0] / plane[0]);
-        shift_x = 0;
-        shift_y = (viewport[1] - ratio_y) / 2.0f;
+        // Choose which edge to touch (preserve aspect ratio)
+        aspect_plane = (float)plane[0] / plane[1];
+        aspect_viewport = (float)viewport[0] / viewport[1];
+
+        if (aspect_viewport > aspect_plane) {
+            // viewport wider than plane
+            ratio_x = plane[0] * (float)((float)viewport[1] / plane[1]);
+            ratio_y = viewport[1];
+            shift_x = (viewport[0] - ratio_x) / 2.0f;
+            shift_y = 0;
+        } else {
+            // plane wider than viewport
+            ratio_x = viewport[0];
+            ratio_y = plane[1] * (float)((float)viewport[0] / plane[0]);
+            shift_x = 0;
+            shift_y = (viewport[1] - ratio_y) / 2.0f;
+        }
     }
 
     // Instead of normalized UVs, use full texture size.
@@ -574,22 +585,20 @@ void MALI_BlitterReconfigure(_THIS, SDL_Window *window, MALI_Blitter *blitter)
         return;
 
     SDL_LockMutex(blitter->mutex);
-    if (blitter->was_initialized) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "mali-fbdev: Reconfiguring a device that wasn't torn down.\n");
-        goto blit_reconfig_done;
-    }
-
-    /* Reconfigure the device */
+    
+    /* Always update blitter configuration parameters */
+    printf("[TRACE] MALI_BlitterReconfigure: updating blitter config for window %dx%d\n", window->w, window->h);
+    
     blitter->window = window;
     blitter->egl_display = _this->egl_data->egl_display;
     printf("[TRACE] MALI_Blitter_CreateContext: egl_display=%p\n", blitter->egl_display);
-    blitter->viewport_width = dispdata->native_display.width,
-    blitter->viewport_height = dispdata->native_display.height,
+    blitter->viewport_width = dispdata->native_display.width;
+    blitter->viewport_height = dispdata->native_display.height;
     blitter->plane_width = window->w;
     blitter->plane_height = window->h;
     blitter->plane_pitch = dispdata->stride;
     blitter->rotation = dispdata->rotation;
-blit_reconfig_done:
+    
     SDL_UnlockMutex(blitter->mutex);
 }
 
@@ -629,6 +638,16 @@ void MALI_BlitterQuit(MALI_Blitter *blitter)
     blitter->thread = NULL;
     SDL_DestroyMutex(blitter->mutex);
     SDL_DestroyCond(blitter->cond);
+    
+    /* Unload dynamic libraries */
+    if (blitter->egl_obj) {
+        SDL_UnloadObject(blitter->egl_obj);
+        blitter->egl_obj = NULL;
+    }
+    if (blitter->gles2_obj) {
+        SDL_UnloadObject(blitter->gles2_obj);
+        blitter->gles2_obj = NULL;
+    }
 }
 
 #endif /* SDL_VIDEO_OPENGL_EGL */
