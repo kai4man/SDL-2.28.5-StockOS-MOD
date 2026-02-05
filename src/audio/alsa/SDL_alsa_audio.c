@@ -457,11 +457,17 @@ static int ALSA_CaptureFromDevice(_THIS, void *buffer, int buflen)
 
 static void ALSA_FlushCapture(_THIS)
 {
+    if (!this->hidden || !this->hidden->pcm_handle) {
+        return;
+    }
     ALSA_snd_pcm_reset(this->hidden->pcm_handle);
 }
 
 static void ALSA_CloseDevice(_THIS)
 {
+    if (!this->hidden) {
+        return;
+    }
     if (this->hidden->pcm_handle) {
         /* Wait for the submitted audio to drain
            ALSA_snd_pcm_drop() can hang, so don't use that.
